@@ -1,0 +1,20 @@
+NOTES
+
+- ChessBoard
+  
+  - BitBoard
+    # Object of chess board
+  # visulistaion
+  - bitmap_to_string
+  - chess_notation_to_bitmap
+  - bitboard_to_fen
+  # board manipulation
+  - move_piece
+  - add_piece_to_square
+  - remove_square
+  - init_starting_position
+  - xy_to_square_bitmap
+  - piece_at_square
+  
+
+  

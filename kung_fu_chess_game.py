@@ -26,6 +26,12 @@ class ChessBoard:
             self.frozen = 0x0000000000000000
             self.moving = 0x0000000000000000
 
+            #castling rights
+            self.white_KS_castle = True
+            self.white_QS_castle = True
+            self.black_KS_castle = True
+            self.black_QS_castle = True
+
    
     def __init__(self):
 
@@ -150,6 +156,28 @@ class ChessBoard:
         """
         return self.FILE_MAP[self.X_TO_FILES[x]] & self.RANK_MAP[self.Y_TO_RANKS[y]]
 
+    def bitmap_to_xy(self, bit_square):
+        """
+        Converts input bitmap to (x,y)
+        """
+        # Determine the rank (y coordinate)
+        for rank, rank_bitmap in self.RANK_MAP.items():
+            if bit_square & rank_bitmap:
+                y = self.RANKS_TO_Y[rank]
+                break
+        else:
+            raise ValueError("Invalid bit_square: rank not found")
+        
+        # Determine the file (x coordinate)
+        for file, file_bitmap in self.FILE_MAP.items():
+            if bit_square & file_bitmap:
+                x = self.FILES_TO_X[file]
+                break
+        else:
+            raise ValueError("Invalid bit_square: file not found")
+
+        return x,y
+
     def init_starting_position(self):
         
         ### Initialize piece bitmaps
@@ -170,7 +198,11 @@ class ChessBoard:
         self.bit_board.frozen = 0x0000000000000000
         self.bit_board.moving = 0x0000000000000000
 
-        # TODO add castling
+        #castling rights
+        self.white_KS_castle = True
+        self.white_QS_castle = True
+        self.black_KS_castle = True
+        self.black_QS_castle = True
 
         return
 
@@ -198,6 +230,41 @@ class ChessBoard:
         # Join rows with newline characters
         return '\n'.join(rows)
 
+    def is_move_legal(self, start_square, end_square):
+
+        # get piece
+        piece = self.piece_at_square(start_square)
+        end_piece = self.piece_at_square(end_square)
+
+        # if piece does not exist on square move not legal
+        if piece == None:
+            return False
+        
+        # cannot capture own piece
+        if end_piece != None:
+            if end_piece.isupper() == piece.isupper():
+                return False
+        
+        # get xy coordinates
+        start_x, start_y = self.bitmap_to_xy(start_square)
+        end_x, end_y = self.bitmap_to_xy(end_square)
+
+
+        # check legal moves of all pieces
+        if piece.upper() == "P":
+            
+
+        elif piece.upper() == "K":
+            #TODO, add caslting
+            
+            # check x and y only change by at least 1
+            if abs(end_x - start_x) > 1 or abs(end_y - start_y) > 1:
+                return False
+        
+
+
+        return True
+
     def move_piece(self, start_square, end_square):
         # TODO kung fu slow moving piece
 
@@ -207,16 +274,23 @@ class ChessBoard:
         # check if piece exists on start square
         if self.bit_board.occupied & start_square_bitmap == 0:
             return
-        
+
         #TODO check if legal move
+        if False == self.is_move_legal(start_square_bitmap, end_square_bitmap): 
+            return
 
         # Check if end_square is occupied
             # if occupied remove captured piece
+            #TODO kungfu chess this happens only when piece transitions from moving to frozen
         if self.bit_board.occupied & end_square_bitmap != 0:
             self.remove_square(end_square_bitmap) 
         
         # Move piece
         piece = self.piece_at_square(start_square_bitmap)
+        
+        # TODO remove castling rights
+        # TODO add promotion
+
         self.add_piece_to_square(piece, end_square_bitmap)
         self.remove_square(start_square_bitmap)
 
@@ -228,6 +302,7 @@ class ChessBoard:
         self.bit_board.white &= ~square
         self.bit_board.black &= ~square
         self.bit_board.pawns &= ~square
+        self.bit_board.rooks &= ~square
         self.bit_board.knights &= ~square
         self.bit_board.bishops &= ~square
         self.bit_board.queens &= ~square
@@ -258,6 +333,20 @@ class ChessBoard:
         elif piece.upper() == 'K':
             self.bit_board.kings |= square
 
+def render_board(fen): 
+    renderer = BoardImage(fen)
+    image = renderer.render()
+
+        # Convert PIL image to a format OpenCV can display
+    image_np = np.array(image)  # Convert PIL image to NumPy array
+    image_bgr = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)  # Convert RGB to BGR
+    resized_image = cv2.resize(image_bgr, (512,512), interpolation=cv2.INTER_AREA)
+
+    cv2.imshow('Chess Board', resized_image)
+    cv2.waitKey(1)  # Wait 1 millisecond to allow the image to be updated
+
+    return
+
 def main():
     """
     The main function of the script.
@@ -265,31 +354,22 @@ def main():
     board = ChessBoard()
     board.init_starting_position()
 
-    
+    fen = board.bitboard_to_fen()
+    render_board(fen)
 
-
-    move = ""
+    print("Input Move: ")
+    move = input()
     # Loop to continuously prompt for moves and update the image
     while move != "q":
         
-        fen = board.bitboard_to_fen()
-
-        renderer = BoardImage(fen)
-        image = renderer.render()
-
-         # Convert PIL image to a format OpenCV can display
-        image_np = np.array(image)  # Convert PIL image to NumPy array
-        image_bgr = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)  # Convert RGB to BGR
-        resized_image = cv2.resize(image_bgr, (256,256), interpolation=cv2.INTER_AREA)
-
-        cv2.imshow('Resized Chess Board', resized_image)
-        cv2.waitKey(1)  # Wait 1 millisecond to allow the image to be updated
-
-        move = input()
-
         start_square = move[:2]
         end_square = move[2:4]
         board.move_piece(start_square, end_square)
+
+        fen = board.bitboard_to_fen()
+        render_board(fen)
+
+        move = input()
 
     # finish up
     cv2.destroyAllWindows()
