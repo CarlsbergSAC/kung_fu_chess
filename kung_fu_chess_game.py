@@ -85,7 +85,8 @@ class ChessBoard:
         self.X_TO_FILES = {v: k for k, v in self.FILES_TO_X.items()}
         self.Y_TO_RANKS = {v: k for k, v in self.RANKS_TO_Y.items()}
 
-
+        ### Other
+        # init board state
         self.bit_board = self.BitBoard()
 
         return
@@ -230,6 +231,30 @@ class ChessBoard:
         # Join rows with newline characters
         return '\n'.join(rows)
 
+    def is_obstruction(self, start, end):
+        x1, y1 = start
+        x2, y2 = end
+        
+        # If the move is not a straight line or diagonal, return False
+        if not (x1 == x2 or y1 == y2 or abs(x1 - x2) == abs(y1 - y2)):
+            return False
+        
+        # Determine the step for each coordinate
+        step_x = (x2 - x1) // max(1, abs(x2 - x1)) if x1 != x2 else 0
+        step_y = (y2 - y1) // max(1, abs(y2 - y1)) if y1 != y2 else 0
+        
+        # Start checking from the next square after the start
+        current_x, current_y = x1 + step_x, y1 + step_y
+    
+        while (current_x, current_y) != (x2, y2):
+            bit_square = self.xy_to_square_bitmap(current_x, current_y)
+            if self.bit_board.occupied & bit_square != 0:
+                return True
+            current_x += step_x
+            current_y += step_y
+        
+        return False
+
     def is_move_legal(self, start_square, end_square):
 
         # get piece
@@ -249,19 +274,32 @@ class ChessBoard:
         start_x, start_y = self.bitmap_to_xy(start_square)
         end_x, end_y = self.bitmap_to_xy(end_square)
 
+        # get distance travalled
+        x_dist = abs(start_x - end_x)
+        y_dist = abs(start_y - end_y)
 
-        # check legal moves of all pieces
-        if piece.upper() == "P":
-            
+        # check obstructions between squares
+        if self.is_obstruction((start_x, start_y), (end_x, end_y)):
+            return False
 
-        elif piece.upper() == "K":
-            #TODO, add caslting
-            
-            # check x and y only change by at least 1
-            if abs(end_x - start_x) > 1 or abs(end_y - start_y) > 1:
-                return False
-        
+        match piece.upper():
+            case "N":  # Knight moves
+                if x_dist + y_dist != 3:
+                    return False
+                if not (x_dist == 1 or x_dist == 2):
+                    return False
 
+            case "P":  # Pawn moves
+                # TODO note that pawns need to be segregated by colour 
+                # Check for square one in front
+                if piece == "P" and (end_x - start_x) == 1:
+                    pass
+
+            case "K":  # King moves
+                # TODO: add castling
+                # Check x and y only change by at least 1
+                if x_dist > 1 or y_dist > 1:
+                    return False
 
         return True
 
@@ -340,7 +378,7 @@ def render_board(fen):
         # Convert PIL image to a format OpenCV can display
     image_np = np.array(image)  # Convert PIL image to NumPy array
     image_bgr = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)  # Convert RGB to BGR
-    resized_image = cv2.resize(image_bgr, (512,512), interpolation=cv2.INTER_AREA)
+    resized_image = cv2.resize(image_bgr, (256,256), interpolation=cv2.INTER_AREA)
 
     cv2.imshow('Chess Board', resized_image)
     cv2.waitKey(1)  # Wait 1 millisecond to allow the image to be updated
