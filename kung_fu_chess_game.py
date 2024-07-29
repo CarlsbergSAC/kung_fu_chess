@@ -261,6 +261,10 @@ class ChessBoard:
         piece = self.piece_at_square(start_square)
         end_piece = self.piece_at_square(end_square)
 
+        # cannot move to same square
+        if start_square == end_square:
+            return False
+
         # if piece does not exist on square move not legal
         if piece == None:
             return False
@@ -282,6 +286,14 @@ class ChessBoard:
         if self.is_obstruction((start_x, start_y), (end_x, end_y)):
             return False
 
+        # check if move is straight (note that x_dist = y_dist = 0 already checked)
+        is_straight_move = (x_dist==0 or y_dist==0)
+        is_diagonal_move = (x_dist==y_dist)
+
+        # only knight can move not in straight/diagonal line
+        if piece.upper() != "N" and (not is_straight_move and not is_diagonal_move):
+            return False
+
         match piece.upper():
             case "N":  # Knight moves
                 if x_dist + y_dist != 3:
@@ -290,11 +302,28 @@ class ChessBoard:
                     return False
 
             case "P":  # Pawn moves
-                # TODO note that pawns need to be segregated by colour 
-                # Check for square one in front
-                if piece == "P" and (end_x - start_x) == 1:
-                    pass
-
+                # check direction
+                if piece == "P" and start_y < end_y:
+                    return False
+                elif piece == "p" and start_y > end_y:
+                    return False
+                
+                # check one square forwards
+                if y_dist == 1 and x_dist == 0 and end_piece == None:
+                    return True
+                
+                # two squares forward:
+                if y_dist == 2 and x_dist == 0 and end_piece == None and (start_y == 1 or start_y == 6):
+                    return True
+                
+                # check captures
+                if y_dist == 1 and x_dist == 1:
+                    if end_piece != None or (self.bit_board.enPassant & end_square != 0):
+                        return True
+                    
+                # all other pawn moves are illegal
+                return False
+                    
             case "K":  # King moves
                 # TODO: add castling
                 # Check x and y only change by at least 1
@@ -378,7 +407,7 @@ def render_board(fen):
         # Convert PIL image to a format OpenCV can display
     image_np = np.array(image)  # Convert PIL image to NumPy array
     image_bgr = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)  # Convert RGB to BGR
-    resized_image = cv2.resize(image_bgr, (256,256), interpolation=cv2.INTER_AREA)
+    resized_image = cv2.resize(image_bgr, (400,400), interpolation=cv2.INTER_AREA)
 
     cv2.imshow('Chess Board', resized_image)
     cv2.waitKey(1)  # Wait 1 millisecond to allow the image to be updated
@@ -414,4 +443,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
+
     
