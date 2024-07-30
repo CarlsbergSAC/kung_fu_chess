@@ -2,6 +2,7 @@ import chess
 from fentoimage.board import BoardImage
 import cv2
 import numpy as np
+import time
 
 class ChessBoard:
 
@@ -290,10 +291,6 @@ class ChessBoard:
         is_straight_move = (x_dist==0 or y_dist==0)
         is_diagonal_move = (x_dist==y_dist)
 
-        # only knight can move not in straight/diagonal line
-        if piece.upper() != "N" and (not is_straight_move and not is_diagonal_move):
-            return False
-
         match piece.upper():
             case "N":  # Knight moves
                 if x_dist + y_dist != 3:
@@ -303,9 +300,9 @@ class ChessBoard:
 
             case "P":  # Pawn moves
                 # check direction
-                if piece == "P" and start_y < end_y:
+                if piece == "P" and start_y > end_y:
                     return False
-                elif piece == "p" and start_y > end_y:
+                elif piece == "p" and start_y < end_y:
                     return False
                 
                 # check one square forwards
@@ -326,10 +323,36 @@ class ChessBoard:
                     
             case "K":  # King moves
                 # TODO: add castling
+                # White castling
+                if (start_x, start_y) == (4,0) and piece == "K": 
+                    if (end_x, end_y) == (6,0) and self.bit_board.white_KS_castle:
+                        return True
+                    if (end_x, end_y) == (2,0) and self.bit_board.white_QS_castle:
+                        return True
+                # Black castling 
+                elif (start_x, start_y) == (4,7) and piece == "k": 
+                    if (end_x, end_y) == (6,7) and self.bit_board.black_KS_castle:
+                        return True
+                    if (end_x, end_y) == (2,7) and self.bit_board.black_QS_castle:
+                        return True
+                
+
                 # Check x and y only change by at least 1
                 if x_dist > 1 or y_dist > 1:
                     return False
 
+            case "R": # Rook Moves
+                if not is_straight_move:
+                    return False
+            
+            case "B": # Bishop Moves
+                if not is_diagonal_move:
+                    return False
+            
+            case "Q": # Queen Moves
+                if not is_straight_move and not is_diagonal_move:
+                    return False
+            
         return True
 
     def move_piece(self, start_square, end_square):
@@ -352,10 +375,14 @@ class ChessBoard:
         if self.bit_board.occupied & end_square_bitmap != 0:
             self.remove_square(end_square_bitmap) 
         
-        # Move piece
+        ###  Move piece
         piece = self.piece_at_square(start_square_bitmap)
         
-        # TODO remove castling rights
+        # TODO handle castling
+        #self.if_castle_move_rook(start_square_bitmap, end_square_bitmap)
+
+        self.remove_castling_rights(start_square_bitmap, end_square_bitmap)
+
         # TODO add promotion
 
         self.add_piece_to_square(piece, end_square_bitmap)
@@ -363,6 +390,33 @@ class ChessBoard:
 
         return
     
+    def remove_castling_rights(self, start_square_bitmap, end_square_bitmap):
+        """Removes castling rights if start or end square impact caslting square"""
+        # impacted squares (to help with removing end square for kung fu)
+        impacted_squares = start_square_bitmap | end_square_bitmap
+
+        if impacted_squares & self.xy_to_square_bitmap(0,0):
+            self.bit_board.white_QS_castle = False
+        
+        if impacted_squares & self.xy_to_square_bitmap(7,0):
+            self.bit_board.white_KS_castle = False
+        
+        if impacted_squares & self.xy_to_square_bitmap(4,0):
+            self.bit_board.white_QS_castle = False
+            self.bit_board.white_KS_castle = False
+
+        if impacted_squares & self.xy_to_square_bitmap(0,7):
+            self.bit_board.black_QS_castle = False
+        
+        if impacted_squares & self.xy_to_square_bitmap(7,7):
+            self.bit_board.black_KS_castleS_castle = False
+        
+        if impacted_squares & self.xy_to_square_bitmap(4,7):
+            self.bit_board.black_QS_castle = False
+            self.bit_board.black_KS_castle = False      
+    
+        return
+
     def remove_square(self, square):
         # clears piece from square
         self.bit_board.occupied &= ~square
@@ -431,6 +485,7 @@ def main():
         
         start_square = move[:2]
         end_square = move[2:4]
+         
         board.move_piece(start_square, end_square)
 
         fen = board.bitboard_to_fen()
